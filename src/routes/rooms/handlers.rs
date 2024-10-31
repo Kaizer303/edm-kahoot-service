@@ -52,3 +52,8 @@ pub async fn next_question(Path(id): Path<String>) -> Result<impl IntoResponse, 
     RoomModel::get_instance().next_question(id).await?;
     Ok((StatusCode::OK, "Next question started"))
 }
+
+pub async fn end_question(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
+    RoomModel::get_instance().end_question(id).await?;
+    Ok((StatusCode::OK, "Room ended and players removed"))
+}

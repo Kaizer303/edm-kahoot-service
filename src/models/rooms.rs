@@ -261,4 +261,22 @@ impl RoomModel {
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         Ok(())
     }
+
+    pub async fn end_question(&self, room_id: String) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let update = doc! {
+            "$set": {
+                "status": RoomStatus::End.to_string(),
+                "currentQuestion": 1,
+                "players": []
+            }
+        };
+        self.collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        Ok(())
+    }
 }
