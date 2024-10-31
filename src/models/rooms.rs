@@ -9,6 +9,7 @@ use strum::Display;
 
 use crate::databases::mongo::MongoDb;
 use crate::utils::error::AppError;
+use crate::utils::score::{calculate_score, check_answer};
 use crate::utils::serializer::serialize_option_object_id;
 static ROOM_MODEL: OnceLock<RoomModel> = OnceLock::new();
 
@@ -16,22 +17,22 @@ pub struct RoomModel {
     collection: Collection<Room>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Choice {
     pub name: String,
     #[serde(rename = "isCorrect")]
     pub is_correct: bool,
     #[serde(rename = "countPlayers")]
-    pub count_players: i32,
+    pub count_players: Option<i32>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Question {
     #[serde(rename = "_id", serialize_with = "serialize_option_object_id")]
     pub id: Option<ObjectId>,
     pub name: String,
-    pub timer: i32,
+    pub timer: u32,
     pub choices: Vec<Choice>,
 }
 
@@ -63,7 +64,7 @@ pub struct Room {
     #[serde(rename = "hostName")]
     pub host_name: String,
     pub status: RoomStatus,
-    pub players: Vec<Player>,
+    pub players: Option<Vec<Player>>,
     pub questions: Vec<Question>,
 }
 
@@ -78,6 +79,7 @@ impl RoomModel {
     }
 
     pub async fn create(&self, mut room: Room) -> Result<Room, AppError> {
+        room.players = Some(vec![]);
         for question in &mut room.questions {
             question.id = Some(ObjectId::new());
         }
@@ -104,13 +106,14 @@ impl RoomModel {
             })?;
 
         if let Some(room) = room {
-            if room.players.iter().any(|player| player.name == player_name) {
-                return Err(AppError::new(
-                    StatusCode::BAD_REQUEST,
-                    "Player already in the room".to_string(),
-                ));
-            }
-
+            if let Some(players) = &room.players {
+                if players.iter().any(|player| player.name == player_name) {
+                    return Err(AppError::new(
+                        StatusCode::BAD_REQUEST,
+                        "Player already in the room".to_string(),
+                    ));
+                }
+            };
             let update = doc! {
                 "$push": {
                     "players": {
@@ -148,6 +151,49 @@ impl RoomModel {
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         Ok(())
+    }
+
+    pub async fn update_answer(
+        &self,
+        room_id: String,
+        question_id: String,
+        player_name: String,
+        choice: String,
+        remaining_time: u32,
+    ) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, e.to_string()))?;
+        let question_id = ObjectId::parse_str(&question_id)
+            .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, e.to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let room_data = self
+            .collection
+            .find_one(filter)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        if let Some(data) = room_data {
+            match data.questions.iter().find(|q| q.id == Some(question_id)) {
+                Some(question) => {
+                    let question_timer = question.timer * 1000; // convert to ms
+                    let score: u32;
+                    if check_answer(question.choices.clone(), choice) {
+                        let score = calculate_score(question_timer, remaining_time);
+                    }
+                    Ok(())
+                }
+                None => {
+                    return Err(AppError::new(
+                        StatusCode::NOT_FOUND,
+                        "Question not found".to_string(),
+                    ));
+                }
+            }
+        } else {
+            return Err(AppError::new(
+                StatusCode::NOT_FOUND,
+                "Room not found".to_string(),
+            ));
+        }
     }
 
     pub async fn get_by_id(&self, room_id: String) -> Result<Room, AppError> {
