@@ -13,7 +13,7 @@ pub fn room_router() -> Router {
         .route("/rooms/:id", get(handlers::get_room))
         .route("/rooms/:id/status", put(handlers::update_room_status))
         .route(
-            "/rooms/:room_id/questions/:question_id",
+            "/rooms/:room_id/questions/:question_id/answer",
             put(handlers::answer_question),
         )
         .route("/rooms/:id/questions/next", put(handlers::next_question))
