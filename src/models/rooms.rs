@@ -89,10 +89,11 @@ impl RoomModel {
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         room.id = Some(result.inserted_id.as_object_id().unwrap());
+        room.pin = (rand::random::<u32>() % 1_000_000) as i32;
         Ok(room)
     }
 
-    pub async fn insert_player(&self, pin: i32, player_name: String) -> Result<(), AppError> {
+    pub async fn insert_player(&self, pin: i32, player_name: String) -> Result<Room, AppError> {
         let filter = doc! { "pin": pin };
         let room = self
             .collection
@@ -132,7 +133,7 @@ impl RoomModel {
                         "Error inserting player".to_string(),
                     )
                 })?;
-            Ok(())
+            Ok(room)
         } else {
             Err(AppError::new(
                 StatusCode::BAD_REQUEST,

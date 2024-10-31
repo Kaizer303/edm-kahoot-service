@@ -22,12 +22,13 @@ pub async fn join_room(
     let pin: i32 = pin
         .parse::<i32>()
         .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid pin".to_string()))?;
-    RoomModel::get_instance()
+    let result = RoomModel::get_instance()
         .insert_player(pin, name)
         .await
         .map_err(|e| e)?;
 
-    Ok(Json(format!("Joining room success",)))
+    let room_id = result.id.unwrap().to_string();
+    Ok(Json(serde_json::json!({ "roomID": room_id })))
 }
 
 pub async fn update_room_status(
