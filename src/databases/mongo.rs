@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{env, sync::OnceLock};
 
 use mongodb::{Client, Database};
 
@@ -14,11 +14,9 @@ pub struct MongoDb {
 impl MongoDb {
     pub async fn init() {
         println!("Connecting to MongoDB");
-        let client = Client::with_uri_str(
-            "mongodb://mongo:ObTlLrUPKILhkAqQLBGOUWXxbhDZTmvO@autorack.proxy.rlwy.net:59927",
-        )
-        .await
-        .expect("Can't connect to MongoDB");
+        let client = Client::with_uri_str(env::var("MONGO_URI").expect("MONGO_URI is not set"))
+            .await
+            .expect("Can't connect to MongoDB");
 
         let db = client.database("kahoot");
 
