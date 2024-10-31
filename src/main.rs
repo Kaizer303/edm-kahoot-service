@@ -13,7 +13,10 @@ async fn main() {
     dotenvy::dotenv().ok();
     MongoDb::init().await;
 
-    let cors = CorsLayer::new().allow_origin(Any);
+    let cors = CorsLayer::new()
+        .allow_headers(Any)
+        .allow_methods(Any)
+        .allow_origin(Any);
     let routes = router().layer(cors);
 
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
