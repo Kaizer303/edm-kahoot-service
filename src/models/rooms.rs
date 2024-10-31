@@ -59,8 +59,8 @@ pub struct Room {
     #[serde(rename = "_id", serialize_with = "serialize_option_object_id")]
     pub id: Option<ObjectId>,
     #[serde(rename = "currentQuestion")]
-    pub current_question: i32,
-    pub pin: i32,
+    pub current_question: Option<u32>,
+    pub pin: Option<u32>,
     #[serde(rename = "hostName")]
     pub host_name: String,
     pub status: RoomStatus,
@@ -169,17 +169,37 @@ impl RoomModel {
         let filter = doc! { "_id": room_id };
         let room_data = self
             .collection
-            .find_one(filter)
+            .find_one(filter.clone())
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         if let Some(data) = room_data {
             match data.questions.iter().find(|q| q.id == Some(question_id)) {
                 Some(question) => {
                     let question_timer = question.timer * 1000; // convert to ms
-                    let score: u32;
-                    if check_answer(question.choices.clone(), choice) {
-                        let score = calculate_score(question_timer, remaining_time);
+                    let mut score: u32 = 0;
+                    let update_choice_count: Option<i32> = None;
+                    match check_answer(question.choices.clone(), choice) {
+                        Ok((choice_name, is_correct)) => {
+                            if is_correct {
+                                score = calculate_score(question_timer, remaining_time);
+                            }
+                        }
+                        Err(e) => {
+                            return Err(e);
+                        }
                     }
+                    let update = doc! {
+                        "$set": {
+                            "players.$.score": score
+                        }
+                    };
+
+                    self.collection
+                        .update_one(filter, update)
+                        .await
+                        .map_err(|e| {
+                            AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        })?;
                     Ok(())
                 }
                 None => {
