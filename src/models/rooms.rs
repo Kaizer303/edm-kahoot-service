@@ -59,8 +59,8 @@ pub struct Room {
     #[serde(rename = "_id", serialize_with = "serialize_option_object_id")]
     pub id: Option<ObjectId>,
     #[serde(rename = "currentQuestion")]
-    pub current_question: Option<i32>,
-    pub pin: i32,
+    pub current_question: Option<u32>,
+    pub pin: Option<u32>,
     #[serde(rename = "hostName")]
     pub host_name: String,
     pub status: RoomStatus,
@@ -176,8 +176,16 @@ impl RoomModel {
                 Some(question) => {
                     let question_timer = question.timer * 1000; // convert to ms
                     let mut score: u32 = 0;
-                    if check_answer(question.choices.clone(), choice) {
-                        score = calculate_score(question_timer, remaining_time);
+                    let update_choice_count: Option<i32> = None;
+                    match check_answer(question.choices.clone(), choice) {
+                        Ok((choice_name, is_correct)) => {
+                            if is_correct {
+                                score = calculate_score(question_timer, remaining_time);
+                            }
+                        }
+                        Err(e) => {
+                            return Err(e);
+                        }
                     }
                     let update = doc! {
                         "$set": {
