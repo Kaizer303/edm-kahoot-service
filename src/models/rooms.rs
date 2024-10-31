@@ -86,6 +86,7 @@ impl RoomModel {
             question.id = Some(ObjectId::new());
         }
         room.pin = Some(rand::random::<u32>() % 1_000_000);
+        room.current_question = Some(1);
         let result = self
             .collection
             .insert_one(&room)
