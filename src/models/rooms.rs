@@ -2,8 +2,6 @@ use std::sync::OnceLock;
 
 use axum::http::StatusCode;
 use mongodb::bson::doc;
-use mongodb::options::ClientOptions;
-use mongodb::Client;
 use mongodb::{bson::oid::ObjectId, Collection};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -96,20 +94,55 @@ impl RoomModel {
         &self,
         room_id: String,
         player_name: String,
-    ) -> mongodb::error::Result<()> {
-        let room_id = ObjectId::parse_str(&room_id).unwrap();
-        let filter = doc! { "_id": room_id, "players.name": { "$ne": &player_name } };
-        let update = doc! {
-            "$push": {
-                "players": {
-                    "name": player_name,
-                    "score": 0
-                }
-            }
-        };
+    ) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
+        // let room_id = ObjectId::with_string(&id).map_err(|e| e.to_string())?;
+        let filter = doc! { "_id": room_id };
+        let room = self
+            .collection
+            .find_one(filter.clone())
+            .await
+            .map_err(|e| {
+                AppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error finding room".to_string(),
+                )
+            })?;
 
-        self.collection.update_one(filter, update).await?;
-        Ok(())
+        if let Some(room) = room {
+            if room.players.iter().any(|player| player.name == player_name) {
+                return Err(AppError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Player already in the room".to_string(),
+                ));
+            }
+
+            let update = doc! {
+                "$push": {
+                    "players": {
+                        "name": player_name,
+                        "score": 0
+                    }
+                }
+            };
+
+            self.collection
+                .update_one(filter, update)
+                .await
+                .map_err(|e| {
+                    AppError::new(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Error inserting player".to_string(),
+                    )
+                })?;
+            Ok(())
+        } else {
+            Err(AppError::new(
+                StatusCode::BAD_REQUEST,
+                "Room not found".to_string(),
+            ))
+        }
     }
 
     pub async fn update_status(&self, room_id: String, status: RoomStatus) -> Result<(), AppError> {

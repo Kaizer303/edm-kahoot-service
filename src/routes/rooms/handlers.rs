@@ -17,12 +17,14 @@ pub async fn post_room(Json(room): Json<Room>) -> Result<impl IntoResponse, AppE
 pub async fn join_room(
     Path(id): Path<String>,
     Json(payload): Json<JoinRequest>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
+) -> Result<impl IntoResponse, AppError> {
     let name = payload.name;
-    match RoomModel::get_instance().insert_player(id, name).await {
-        Ok(_) => Ok((StatusCode::OK, "ok".to_string())),
-        Err(_) => Err((StatusCode::BAD_REQUEST, "can't join the room".to_string())),
-    }
+    RoomModel::get_instance()
+        .insert_player(id, name)
+        .await
+        .map_err(|e| e)?;
+
+    Ok(Json(format!("Joining room success",)))
 }
 
 pub async fn update_room_status(
