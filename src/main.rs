@@ -18,7 +18,7 @@ async fn insert_player(room_id: i64, player_name: String) -> mongodb::error::Res
     let database = client.database("kahoot");
     let collection = database.collection("rooms");
 
-    let filter = doc! { "_id": room_id };
+    let filter = doc! { "_id": room_id, "players.name": { "$ne": player_name } };
     let update = doc! {
         "$push": {
             "players": {
