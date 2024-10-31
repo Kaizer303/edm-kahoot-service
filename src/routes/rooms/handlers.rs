@@ -36,3 +36,16 @@ pub async fn update_room_status(
         .await?;
     Ok((StatusCode::OK, "OK"))
 }
+
+pub async fn get_room(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
+    let room_model = RoomModel::get_instance();
+    println!("id: {}", id);
+    let room = room_model.get_by_id(id).await.map_err(|e| e)?;
+
+    Ok(Json(room))
+}
+
+pub async fn next_question(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
+    RoomModel::get_instance().next_question(id).await?;
+    Ok((StatusCode::OK, "Next question started"))
+}

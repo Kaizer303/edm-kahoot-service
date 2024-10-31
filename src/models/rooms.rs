@@ -98,14 +98,13 @@ impl RoomModel {
         player_name: String,
     ) -> Result<(), AppError> {
         let room_id = ObjectId::parse_str(&room_id)
-            .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
-        // let room_id = ObjectId::with_string(&id).map_err(|e| e.to_string())?;
+            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
         let filter = doc! { "_id": room_id };
         let room = self
             .collection
             .find_one(filter.clone())
             .await
-            .map_err(|e| {
+            .map_err(|_| {
                 AppError::new(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error finding room".to_string(),
@@ -120,24 +119,25 @@ impl RoomModel {
                         "Player already in the room".to_string(),
                     ));
                 }
-                let update = doc! {
-                    "$push": {
-                        "players": {
-                            "name": player_name,
-                            "score": 0
-                        }
+            };
+            let update = doc! {
+                "$push": {
+                    "players": {
+                        "name": player_name,
+                        "score": 0
                     }
-                };
-                self.collection
-                    .update_one(filter, update)
-                    .await
-                    .map_err(|e| {
-                        AppError::new(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Error inserting player".to_string(),
-                        )
-                    })?;
-            }
+                }
+            };
+
+            self.collection
+                .update_one(filter, update)
+                .await
+                .map_err(|_| {
+                    AppError::new(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Error inserting player".to_string(),
+                    )
+                })?;
             Ok(())
         } else {
             Err(AppError::new(
@@ -200,5 +200,34 @@ impl RoomModel {
                 "Room not found".to_string(),
             ));
         }
+    }
+
+    pub async fn get_by_id(&self, room_id: String) -> Result<Room, AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let room = self.collection.find_one(filter).await.map_err(|e| {
+            AppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error finding room".to_string(),
+            )
+        })?;
+
+        room.ok_or_else(|| AppError::new(StatusCode::NOT_FOUND, "Room not found".to_string()))
+    }
+
+    pub async fn next_question(&self, room_id: String) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let update = doc! {
+            "$inc": { "currentQuestion": 1 },
+            "$set": { "status": "countdown" }
+        };
+        self.collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        Ok(())
     }
 }
