@@ -1,13 +1,8 @@
 use axum::{extract::Path, http::StatusCode, response::IntoResponse, Json};
-use mongodb::bson::oid::ObjectId;
-use serde::Deserialize;
 
 use crate::models::rooms::{Room, RoomModel};
 
-#[derive(Deserialize)]
-pub struct JoinRequest {
-    pub name: String,
-}
+use super::schemas::JoinRequest;
 
 pub async fn post_room(Json(room): Json<Room>) -> Result<impl IntoResponse, impl IntoResponse> {
     let room_model = RoomModel::get_instance();
