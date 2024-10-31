@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 use tokio::time::{sleep, Duration};
 
 use axum::http::StatusCode;
-use mongodb::bson::{doc, Document};
+use mongodb::bson::doc;
 use mongodb::{bson::oid::ObjectId, Collection};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -189,7 +189,7 @@ impl RoomModel {
                 .questions
                 .iter()
                 .enumerate()
-                .find(|(i, q)| q.id == Some(question_id))
+                .find(|(_i, q)| q.id == Some(question_id))
             {
                 Some((question_index, question)) => {
                     dbg!(&data);
@@ -200,6 +200,7 @@ impl RoomModel {
                         Ok((c_i, is_correct)) => {
                             if is_correct {
                                 score = calculate_score(question_timer, payload.remain_timer);
+                                dbg!(&score);
                                 choice_index = c_i;
                             }
                         }
@@ -213,7 +214,7 @@ impl RoomModel {
                         player_index = players
                             .iter()
                             .enumerate()
-                            .find(|(i, p)| p.name == payload.player_name)
+                            .find(|(_i, p)| p.name == payload.player_name)
                             .map(|(i, _)| i)
                             .ok_or(AppError::new(
                                 StatusCode::BAD_REQUEST,
@@ -255,18 +256,16 @@ impl RoomModel {
                         })?;
                     Ok(())
                 }
-                None => {
-                    return Err(AppError::new(
-                        StatusCode::NOT_FOUND,
-                        "Question not found".to_string(),
-                    ));
-                }
+                None => Err(AppError::new(
+                    StatusCode::NOT_FOUND,
+                    "Question not found".to_string(),
+                )),
             }
         } else {
-            return Err(AppError::new(
+            Err(AppError::new(
                 StatusCode::NOT_FOUND,
                 "Room not found".to_string(),
-            ));
+            ))
         }
     }
 
@@ -274,7 +273,7 @@ impl RoomModel {
         let room_id = ObjectId::parse_str(&room_id)
             .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
         let filter = doc! { "_id": room_id };
-        let room = self.collection.find_one(filter).await.map_err(|e| {
+        let room = self.collection.find_one(filter).await.map_err(|_e| {
             AppError::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error finding room".to_string(),
@@ -292,7 +291,7 @@ impl RoomModel {
             .collection
             .find_one(filter.clone())
             .await
-            .map_err(|e| {
+            .map_err(|_e| {
                 AppError::new(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error finding room".to_string(),

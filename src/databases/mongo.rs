@@ -7,7 +7,7 @@ use crate::models::rooms::RoomModel;
 static MONGO_DB: OnceLock<MongoDb> = OnceLock::new();
 
 pub struct MongoDb {
-    pub client: Client,
+    // pub client: Client,
     pub db: Database,
 }
 
@@ -23,7 +23,7 @@ impl MongoDb {
         let db = client.database("kahoot");
 
         println!("Connected to MongoDB");
-        MONGO_DB.get_or_init(|| MongoDb { client, db });
+        MONGO_DB.get_or_init(|| MongoDb { db });
 
         RoomModel::initialize();
     }
