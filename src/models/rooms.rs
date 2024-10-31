@@ -5,6 +5,7 @@ use mongodb::bson::doc;
 use mongodb::{bson::oid::ObjectId, Collection};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use strum::Display;
 
 use crate::databases::mongo::MongoDb;
 use crate::utils::error::AppError;
@@ -40,8 +41,9 @@ pub struct Player {
     pub score: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Display, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum RoomStatus {
     Wait,
     Countdown,
@@ -58,8 +60,8 @@ pub struct Room {
     #[serde(rename = "currentQuestion")]
     pub current_question: i32,
     pub pin: i32,
-    #[serde(rename = "hostID", serialize_with = "serialize_option_object_id")]
-    pub host_id: Option<ObjectId>,
+    #[serde(rename = "hostName")]
+    pub host_name: String,
     pub status: RoomStatus,
     pub players: Vec<Player>,
     pub questions: Vec<Question>,
@@ -75,12 +77,15 @@ impl RoomModel {
         ROOM_MODEL.get().unwrap()
     }
 
-    pub async fn create(&self, mut room: Room) -> Result<Room, mongodb::error::Error> {
-        room.host_id = Some(ObjectId::new());
+    pub async fn create(&self, mut room: Room) -> Result<Room, AppError> {
         for question in &mut room.questions {
             question.id = Some(ObjectId::new());
         }
-        let result = self.collection.insert_one(&room).await?;
+        let result = self
+            .collection
+            .insert_one(&room)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         room.id = Some(result.inserted_id.as_object_id().unwrap());
         Ok(room)
     }
@@ -139,11 +144,23 @@ impl RoomModel {
         }
     }
 
+    pub async fn update_status(&self, room_id: String, status: RoomStatus) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, e.to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let update = doc! { "$set": { "status": status.to_string() } };
+        self.collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        Ok(())
+    }
+
     pub async fn get_by_id(&self, room_id: String) -> Result<Room, AppError> {
         let room_id = ObjectId::parse_str(&room_id)
             .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
         let filter = doc! { "_id": room_id };
-        let room = self.collection.find_one(filter).await.map_err(|_| {
+        let room = self.collection.find_one(filter).await.map_err(|e| {
             AppError::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error finding room".to_string(),

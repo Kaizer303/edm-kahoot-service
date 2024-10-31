@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 
@@ -11,4 +11,5 @@ pub fn room_router() -> Router {
         .route("/rooms", post(handlers::post_room))
         .route("/rooms/:id/join", post(handlers::join_room))
         .route("/rooms/:id", get(handlers::get_room))
+        .route("/rooms/:id/status", put(handlers::update_room_status))
 }
