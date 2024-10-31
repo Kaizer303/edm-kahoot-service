@@ -29,3 +29,10 @@ pub async fn join_room(
 
     Ok(Json(format!("Joining room success",)))
 }
+
+pub async fn get_room(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
+    let room_model = RoomModel::get_instance();
+    let room = room_model.get_by_id(id).await.map_err(|e| e)?;
+
+    Ok(Json(room))
+}
