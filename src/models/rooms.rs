@@ -227,17 +227,28 @@ impl RoomModel {
                     }
 
                     dbg!(&player_index, &question_index, &choice_index);
-                    let update_1 = doc! {
+                    let update_score = doc! {
                         "$set": {
-                            format!("players.{}.score", player_index): score,
-                        },
+                            format!("players.{}.score", player_index): score
+                        }
+                    };
+
+                    self.collection
+                        .update_one(filter.clone(), update_score)
+                        .await
+                        .map_err(|e| {
+                            AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        })?;
+
+                    // Second update: Increment the choice counter
+                    let update_counter = doc! {
                         "$inc": {
                             format!("questions.{}.choices.{}.countPlayers", question_index, choice_index): 1
                         }
                     };
 
                     self.collection
-                        .aggregate(vec![doc! { "$match": filter }, update_1])
+                        .update_one(filter, update_counter)
                         .await
                         .map_err(|e| {
                             AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
