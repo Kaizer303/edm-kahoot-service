@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use tokio::time::{sleep, Duration};
 
 use axum::http::StatusCode;
 use mongodb::bson::{doc, Document};
@@ -90,10 +91,11 @@ impl RoomModel {
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         room.id = Some(result.inserted_id.as_object_id().unwrap());
+        room.pin = Some(rand::random::<u32>() % 1_000_000);
         Ok(room)
     }
 
-    pub async fn insert_player(&self, pin: i32, player_name: String) -> Result<(), AppError> {
+    pub async fn insert_player(&self, pin: i32, player_name: String) -> Result<Room, AppError> {
         let filter = doc! { "pin": pin };
         let room = self
             .collection
@@ -133,7 +135,7 @@ impl RoomModel {
                         "Error inserting player".to_string(),
                     )
                 })?;
-            Ok(())
+            Ok(room)
         } else {
             Err(AppError::new(
                 StatusCode::BAD_REQUEST,
@@ -148,9 +150,21 @@ impl RoomModel {
         let filter = doc! { "_id": room_id };
         let update = doc! { "$set": { "status": status.to_string() } };
         self.collection
-            .update_one(filter, update)
+            .update_one(filter.clone(), update)
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        if status == RoomStatus::Countdown {
+            let collection = self.collection.clone();
+            tokio::spawn(async move {
+                sleep(Duration::from_secs(5)).await;
+                let update = doc! { "$set": { "status": RoomStatus::Start.to_string() } };
+                if let Err(e) = collection.update_one(filter, update).await {
+                    eprintln!("Failed to update room status to start: {}", e);
+                }
+            });
+        }
+
         Ok(())
     }
 
@@ -293,9 +307,19 @@ impl RoomModel {
             "$set": { "status": RoomStatus::Countdown.to_string() }
         };
         self.collection
-            .update_one(filter, update)
+            .update_one(filter.clone(), update)
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        let collection = self.collection.clone();
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(5)).await;
+            let update = doc! { "$set": { "status": RoomStatus::Start.to_string() } };
+            if let Err(e) = collection.update_one(filter, update).await {
+                eprintln!("Failed to update room status to start: {}", e);
+            }
+        });
+
         Ok(())
     }
 

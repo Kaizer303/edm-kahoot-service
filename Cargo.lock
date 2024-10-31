@@ -380,6 +380,7 @@ dependencies = [
  "axum",
  "dotenvy",
  "mongodb",
+ "rand",
  "serde",
  "serde_json",
  "serde_with",
