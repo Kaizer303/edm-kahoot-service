@@ -85,13 +85,14 @@ impl RoomModel {
         for question in &mut room.questions {
             question.id = Some(ObjectId::new());
         }
+        room.pin = Some(rand::random::<u32>() % 1_000_000);
+        room.current_question = Some(1);
         let result = self
             .collection
             .insert_one(&room)
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         room.id = Some(result.inserted_id.as_object_id().unwrap());
-        room.pin = Some(rand::random::<u32>() % 1_000_000);
         Ok(room)
     }
 
