@@ -1,11 +1,14 @@
 use std::sync::OnceLock;
 
-use mongodb::Client;
+use mongodb::{Client, Database};
+
+use crate::models::rooms::RoomModel;
 
 static MONGO_DB: OnceLock<MongoDb> = OnceLock::new();
 
 pub struct MongoDb {
-    client: Client,
+    pub client: Client,
+    pub db: Database,
 }
 
 impl MongoDb {
@@ -20,6 +23,12 @@ impl MongoDb {
         let db = client.database("kahoot");
 
         println!("Connected to MongoDB");
-        MONGO_DB.get_or_init(|| MongoDb { client });
+        MONGO_DB.get_or_init(|| MongoDb { client, db });
+
+        RoomModel::initialize();
+    }
+
+    pub fn get_instance() -> &'static MongoDb {
+        MONGO_DB.get().unwrap()
     }
 }
