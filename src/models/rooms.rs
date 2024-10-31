@@ -42,7 +42,7 @@ pub struct Player {
     pub score: i32,
 }
 
-#[derive(Debug, Display, Serialize, Deserialize)]
+#[derive(Debug, Display, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum RoomStatus {
@@ -92,14 +92,8 @@ impl RoomModel {
         Ok(room)
     }
 
-    pub async fn insert_player(
-        &self,
-        room_id: String,
-        player_name: String,
-    ) -> Result<(), AppError> {
-        let room_id = ObjectId::parse_str(&room_id)
-            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
-        let filter = doc! { "_id": room_id };
+    pub async fn insert_player(&self, pin: i32, player_name: String) -> Result<(), AppError> {
+        let filter = doc! { "pin": pin };
         let room = self
             .collection
             .find_one(filter.clone())
@@ -220,9 +214,34 @@ impl RoomModel {
         let room_id = ObjectId::parse_str(&room_id)
             .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
         let filter = doc! { "_id": room_id };
+        let room = self
+            .collection
+            .find_one(filter.clone())
+            .await
+            .map_err(|e| {
+                AppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error finding room".to_string(),
+                )
+            })?;
+
+        if let Some(room) = room {
+            if room.status != RoomStatus::Summarize {
+                return Err(AppError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Room status must be 'summarize' to proceed to the next question".to_string(),
+                ));
+            }
+        } else {
+            return Err(AppError::new(
+                StatusCode::NOT_FOUND,
+                "Room not found".to_string(),
+            ));
+        }
+
         let update = doc! {
             "$inc": { "currentQuestion": 1 },
-            "$set": { "status": "countdown" }
+            "$set": { "status": RoomStatus::Countdown.to_string() }
         };
         self.collection
             .update_one(filter, update)

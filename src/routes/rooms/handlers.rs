@@ -15,12 +15,15 @@ pub async fn post_room(Json(room): Json<Room>) -> Result<impl IntoResponse, AppE
 }
 
 pub async fn join_room(
-    Path(id): Path<String>,
+    Path(pin): Path<String>,
     Json(payload): Json<JoinRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let name = payload.name;
+    let pin: i32 = pin
+        .parse::<i32>()
+        .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid pin".to_string()))?;
     RoomModel::get_instance()
-        .insert_player(id, name)
+        .insert_player(pin, name)
         .await
         .map_err(|e| e)?;
 
