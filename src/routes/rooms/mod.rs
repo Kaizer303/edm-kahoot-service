@@ -12,4 +12,5 @@ pub fn room_router() -> Router {
         .route("/rooms/:id/join", post(handlers::join_room))
         .route("/rooms/:id", get(handlers::get_room))
         .route("/rooms/:id/status", put(handlers::update_room_status))
+        .route("/rooms/:id/questions/next", put(handlers::next_question))
 }

@@ -44,3 +44,8 @@ pub async fn get_room(Path(id): Path<String>) -> Result<impl IntoResponse, AppEr
 
     Ok(Json(room))
 }
+
+pub async fn next_question(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
+    RoomModel::get_instance().next_question(id).await?;
+    Ok((StatusCode::OK, "Next question started"))
+}

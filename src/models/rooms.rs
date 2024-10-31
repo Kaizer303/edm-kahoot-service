@@ -169,4 +169,19 @@ impl RoomModel {
 
         room.ok_or_else(|| AppError::new(StatusCode::NOT_FOUND, "Room not found".to_string()))
     }
+
+    pub async fn next_question(&self, room_id: String) -> Result<(), AppError> {
+        let room_id = ObjectId::parse_str(&room_id)
+            .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid room id".to_string()))?;
+        let filter = doc! { "_id": room_id };
+        let update = doc! {
+            "$inc": { "currentQuestion": 1 },
+            "$set": { "status": "countdown" }
+        };
+        self.collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        Ok(())
+    }
 }
