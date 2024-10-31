@@ -203,7 +203,6 @@ impl RoomModel {
                         Ok((c_i, is_correct)) => {
                             if is_correct {
                                 score = calculate_score(question_timer, payload.remain_timer);
-                                dbg!(&score);
                                 choice_index = c_i;
                             }
                         }

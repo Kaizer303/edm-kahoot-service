@@ -22,9 +22,7 @@ pub async fn join_room(
     let pin: i32 = pin
         .parse::<i32>()
         .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid pin".to_string()))?;
-    let result = RoomModel::get_instance()
-        .insert_player(pin, name)
-        .await?;
+    let result = RoomModel::get_instance().insert_player(pin, name).await?;
 
     let room_id = result.id.unwrap().to_string();
     Ok(Json(serde_json::json!({ "roomID": room_id })))
@@ -52,7 +50,6 @@ pub async fn answer_question(
 
 pub async fn get_room(Path(id): Path<String>) -> Result<impl IntoResponse, AppError> {
     let room_model = RoomModel::get_instance();
-    println!("id: {}", id);
     let room = room_model.get_by_id(id).await?;
 
     Ok(Json(room))
