@@ -59,7 +59,7 @@ pub struct Room {
     #[serde(rename = "_id", serialize_with = "serialize_option_object_id")]
     pub id: Option<ObjectId>,
     #[serde(rename = "currentQuestion")]
-    pub current_question: i32,
+    pub current_question: Option<i32>,
     pub pin: i32,
     #[serde(rename = "hostName")]
     pub host_name: String,
@@ -168,17 +168,29 @@ impl RoomModel {
         let filter = doc! { "_id": room_id };
         let room_data = self
             .collection
-            .find_one(filter)
+            .find_one(filter.clone())
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         if let Some(data) = room_data {
             match data.questions.iter().find(|q| q.id == Some(question_id)) {
                 Some(question) => {
                     let question_timer = question.timer * 1000; // convert to ms
-                    let score: u32;
+                    let mut score: u32 = 0;
                     if check_answer(question.choices.clone(), choice) {
-                        let score = calculate_score(question_timer, remaining_time);
+                        score = calculate_score(question_timer, remaining_time);
                     }
+                    let update = doc! {
+                        "$set": {
+                            "players.$.score": score
+                        }
+                    };
+
+                    self.collection
+                        .update_one(filter, update)
+                        .await
+                        .map_err(|e| {
+                            AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                        })?;
                     Ok(())
                 }
                 None => {
