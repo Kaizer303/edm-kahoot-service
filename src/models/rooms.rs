@@ -1,5 +1,8 @@
 use std::sync::OnceLock;
 
+use mongodb::bson::doc;
+use mongodb::options::ClientOptions;
+use mongodb::Client;
 use mongodb::{bson::oid::ObjectId, Collection};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -80,5 +83,25 @@ impl RoomModel {
         let result = self.collection.insert_one(&room).await?;
         room.id = Some(result.inserted_id.as_object_id().unwrap());
         Ok(room)
+    }
+
+    pub async fn insert_player(
+        &self,
+        room_id: String,
+        player_name: String,
+    ) -> mongodb::error::Result<()> {
+        let room_id = ObjectId::parse_str(&room_id).unwrap();
+        let filter = doc! { "_id": room_id, "players.name": { "$ne": &player_name } };
+        let update = doc! {
+            "$push": {
+                "players": {
+                    "name": player_name,
+                    "score": 0
+                }
+            }
+        };
+
+        self.collection.update_one(filter, update).await?;
+        Ok(())
     }
 }

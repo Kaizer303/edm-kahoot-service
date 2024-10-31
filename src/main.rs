@@ -18,7 +18,9 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, world!" }))
-        .route("/rooms", post(routes::handlers::post_room));
+        .route("/rooms", post(routes::handlers::post_room))
+        .route("/rooms/:id/join", post(routes::handlers::join_room));
+
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app.into_make_service())
         .await
