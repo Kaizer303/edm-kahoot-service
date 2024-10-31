@@ -196,7 +196,6 @@ impl RoomModel {
                 .find(|(_i, q)| q.id == Some(question_id))
             {
                 Some((question_index, question)) => {
-                    dbg!(&data);
                     let question_timer = question.timer * 1000; // convert to ms
                     let mut score: u32 = 0;
                     let mut choice_index: usize = 0;
@@ -213,7 +212,7 @@ impl RoomModel {
                         }
                     }
 
-                    let player_index: usize;
+                    let (player_index, previous_score): (usize, i32);
                     if let Some(players) = data.players {
                         player_index = players
                             .iter()
@@ -224,6 +223,7 @@ impl RoomModel {
                                 StatusCode::BAD_REQUEST,
                                 "Player not found".to_string(),
                             ))?;
+                        previous_score = players[player_index].score;
                     } else {
                         return Err(AppError::new(
                             StatusCode::BAD_REQUEST,
@@ -231,29 +231,17 @@ impl RoomModel {
                         ));
                     }
 
-                    dbg!(&player_index, &question_index, &choice_index);
                     let update_score = doc! {
                         "$set": {
-                            format!("players.{}.score", player_index): score
-                        }
-                    };
-
-                    self.collection
-                        .update_one(filter.clone(), update_score)
-                        .await
-                        .map_err(|e| {
-                            AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                        })?;
-
-                    // Second update: Increment the choice counter
-                    let update_counter = doc! {
+                            format!("players.{}.score", player_index): score + previous_score as u32
+                        },
                         "$inc": {
                             format!("questions.{}.choices.{}.countPlayers", question_index, choice_index): 1
                         }
                     };
 
                     self.collection
-                        .update_one(filter, update_counter)
+                        .update_one(filter.clone(), update_score)
                         .await
                         .map_err(|e| {
                             AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
