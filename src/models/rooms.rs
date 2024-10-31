@@ -84,6 +84,9 @@ impl RoomModel {
         room.players = Some(vec![]);
         for question in &mut room.questions {
             question.id = Some(ObjectId::new());
+            for choice in &mut question.choices {
+                choice.count_players = Some(0);
+            }
         }
         room.pin = Some(rand::random::<u32>() % 1_000_000);
         room.current_question = Some(1);
