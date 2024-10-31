@@ -156,7 +156,7 @@ impl RoomModel {
         if status == RoomStatus::Countdown {
             let collection = self.collection.clone();
             tokio::spawn(async move {
-                sleep(Duration::from_secs(3)).await;
+                sleep(Duration::from_secs(5)).await;
                 let update = doc! { "$set": { "status": RoomStatus::Start.to_string() } };
                 if let Err(e) = collection.update_one(filter, update).await {
                     eprintln!("Failed to update room status to start: {}", e);
@@ -278,9 +278,19 @@ impl RoomModel {
             "$set": { "status": RoomStatus::Countdown.to_string() }
         };
         self.collection
-            .update_one(filter, update)
+            .update_one(filter.clone(), update)
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        let collection = self.collection.clone();
+        tokio::spawn(async move {
+            sleep(Duration::from_secs(5)).await;
+            let update = doc! { "$set": { "status": RoomStatus::Start.to_string() } };
+            if let Err(e) = collection.update_one(filter, update).await {
+                eprintln!("Failed to update room status to start: {}", e);
+            }
+        });
+
         Ok(())
     }
 
