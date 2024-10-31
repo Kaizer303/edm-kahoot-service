@@ -11,9 +11,9 @@ pub fn calculate_score(total_time: u32, remaining_time: u32) -> u32 {
     score
 }
 
-pub fn check_answer(choices: Vec<Choice>, answer: String) -> Result<(String, bool), AppError> {
-    match choices.iter().find(|c| c.name == answer) {
-        Some(choice) => Ok((choice.name.clone(), choice.is_correct)),
+pub fn check_answer(choices: Vec<Choice>, answer: String) -> Result<(usize, bool), AppError> {
+    match choices.iter().enumerate().find(|(i, c)| c.name == answer) {
+        Some((choice_index, choice)) => Ok((choice_index, choice.is_correct)),
         None => Err(AppError::new(
             StatusCode::BAD_REQUEST,
             "Invalid answer".to_string(),

@@ -5,7 +5,7 @@ use crate::{
     utils::error::AppError,
 };
 
-use super::schemas::{JoinRequest, UpdateStatusBody};
+use super::schemas::{AnswerQuestionBody, AnswerQuestionPath, JoinRequest, UpdateStatusBody};
 
 pub async fn post_room(Json(room): Json<Room>) -> Result<impl IntoResponse, AppError> {
     let room_model = RoomModel::get_instance();
@@ -36,6 +36,16 @@ pub async fn update_room_status(
 ) -> Result<impl IntoResponse, AppError> {
     RoomModel::get_instance()
         .update_status(id, payload.status)
+        .await?;
+    Ok((StatusCode::OK, "OK"))
+}
+
+pub async fn answer_question(
+    Path(params): Path<AnswerQuestionPath>,
+    Json(payload): Json<AnswerQuestionBody>,
+) -> Result<impl IntoResponse, AppError> {
+    RoomModel::get_instance()
+        .update_answer(params.room_id, params.question_id, payload)
         .await?;
     Ok((StatusCode::OK, "OK"))
 }

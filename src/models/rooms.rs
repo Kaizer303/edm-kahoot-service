@@ -1,13 +1,14 @@
 use std::sync::OnceLock;
 
 use axum::http::StatusCode;
-use mongodb::bson::doc;
+use mongodb::bson::{doc, Document};
 use mongodb::{bson::oid::ObjectId, Collection};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
 
 use crate::databases::mongo::MongoDb;
+use crate::routes::rooms::schemas::AnswerQuestionBody;
 use crate::utils::error::AppError;
 use crate::utils::score::{calculate_score, check_answer};
 use crate::utils::serializer::serialize_option_object_id;
@@ -157,9 +158,7 @@ impl RoomModel {
         &self,
         room_id: String,
         question_id: String,
-        player_name: String,
-        choice: String,
-        remaining_time: u32,
+        payload: AnswerQuestionBody,
     ) -> Result<(), AppError> {
         let room_id = ObjectId::parse_str(&room_id)
             .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, e.to_string()))?;
@@ -172,29 +171,59 @@ impl RoomModel {
             .await
             .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         if let Some(data) = room_data {
-            match data.questions.iter().find(|q| q.id == Some(question_id)) {
-                Some(question) => {
+            match data
+                .questions
+                .iter()
+                .enumerate()
+                .find(|(i, q)| q.id == Some(question_id))
+            {
+                Some((question_index, question)) => {
+                    dbg!(&data);
                     let question_timer = question.timer * 1000; // convert to ms
                     let mut score: u32 = 0;
-                    let update_choice_count: Option<i32> = None;
-                    match check_answer(question.choices.clone(), choice) {
-                        Ok((choice_name, is_correct)) => {
+                    let mut choice_index: usize = 0;
+                    match check_answer(question.choices.clone(), payload.answer) {
+                        Ok((c_i, is_correct)) => {
                             if is_correct {
-                                score = calculate_score(question_timer, remaining_time);
+                                score = calculate_score(question_timer, payload.remain_timer);
+                                choice_index = c_i;
                             }
                         }
                         Err(e) => {
                             return Err(e);
                         }
                     }
-                    let update = doc! {
+
+                    let player_index: usize;
+                    if let Some(players) = data.players {
+                        player_index = players
+                            .iter()
+                            .enumerate()
+                            .find(|(i, p)| p.name == payload.player_name)
+                            .map(|(i, _)| i)
+                            .ok_or(AppError::new(
+                                StatusCode::BAD_REQUEST,
+                                "Player not found".to_string(),
+                            ))?;
+                    } else {
+                        return Err(AppError::new(
+                            StatusCode::BAD_REQUEST,
+                            "Players not found".to_string(),
+                        ));
+                    }
+
+                    dbg!(&player_index, &question_index, &choice_index);
+                    let update_1 = doc! {
                         "$set": {
-                            "players.$.score": score
+                            format!("players.{}.score", player_index): score,
+                        },
+                        "$inc": {
+                            format!("questions.{}.choices.{}.countPlayers", question_index, choice_index): 1
                         }
                     };
 
                     self.collection
-                        .update_one(filter, update)
+                        .aggregate(vec![doc! { "$match": filter }, update_1])
                         .await
                         .map_err(|e| {
                             AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
