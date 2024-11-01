@@ -178,7 +178,6 @@ impl RoomModel {
         question_id: String,
         payload: AnswerQuestionBody,
     ) -> Result<(), AppError> {
-        dbg!(&payload);
         let room_id = ObjectId::parse_str(&room_id)
             .map_err(|e| AppError::new(StatusCode::BAD_REQUEST, e.to_string()))?;
         let question_id = ObjectId::parse_str(&question_id)
@@ -202,10 +201,9 @@ impl RoomModel {
                     let mut choice_index: usize = 0;
                     match check_answer(question.choices.clone(), payload.answer) {
                         Ok((c_i, is_correct)) => {
-                            dbg!(&c_i, &is_correct);
+                            choice_index = c_i;
                             if is_correct {
                                 score = calculate_score(question_timer, payload.remain_timer);
-                                choice_index = c_i;
                             }
                         }
                         Err(e) => {
