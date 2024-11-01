@@ -84,6 +84,9 @@ impl RoomModel {
         room.players = Some(vec![]);
         for question in &mut room.questions {
             question.id = Some(ObjectId::new());
+            for choice in &mut question.choices {
+                choice.count_players = Some(0);
+            }
         }
         room.pin = Some(rand::random::<u32>() % 1_000_000);
         room.current_question = Some(1);
@@ -202,7 +205,6 @@ impl RoomModel {
                             dbg!(&c_i, &is_correct);
                             if is_correct {
                                 score = calculate_score(question_timer, payload.remain_timer);
-                                dbg!(&score);
                                 choice_index = c_i;
                             }
                         }
