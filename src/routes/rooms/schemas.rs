@@ -18,7 +18,7 @@ pub struct AnswerQuestionPath {
     pub question_id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnswerQuestionBody {
     pub player_name: String,
